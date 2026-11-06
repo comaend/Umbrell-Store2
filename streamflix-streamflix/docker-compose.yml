@@ -1,0 +1,46 @@
+# StreamFlix — Umbrel Community App Store docker-compose.yml
+#
+# Umbrel stellt die App bereit, indem es `docker compose up` ausfuehrt.
+# Das Image wird beim ersten Start aus dem Dockerfile gebaut (alle
+# Abhaengigkeiten sind bereits im Image enthalten; es wird zur Laufzeit
+# nichts aus dem Internet nachinstalliert).
+#
+# Medienordner:
+#   Der Container legt die Mediendaten schreibgeschuetzt unter /media ab.
+#   Binde deine Medienverzeichnisse über Umbrel (Speicher/USB) oder durch
+#   Ergaenzung weiterer `volumes`-Einträge hier ein, z. B.:
+#     - /mnt/hdd/Movies:/media/Movies:ro,z
+#   Der MEDIA_ROOT-Pfad im Admin-Panel verweist dann auf /media.
+
+version: "3.7"
+
+services:
+  # app_proxy wird von umbrelOS bereitgestellt. Hier konfigurieren wir nur
+  # den Upstream (Host und Port), an den der Proxy Anfragen weiterleitet.
+  app_proxy:
+    environment:
+      APP_HOST: $GATEWAY_IP
+      APP_PORT: 8080
+      PROXY_AUTH_ADD: "false"
+
+  streamflix:
+    build: .
+    restart: on-failure
+    stop_grace_period: 1m
+    user: "1000:1000"
+    volumes:
+      # Persistente App-Daten (Datenbank, Uploads, Cache) unter Umbrel-App-Datenverzeichnis
+      - ${APP_DATA_DIR:-./data}/data:/var/www/html/data:z
+      # Medienbibliothek schreibgeschuetzt einbinden. Pfad anpassen oder
+      # weitere Bind-Mounts für externe Festplatten hinzufügen.
+      - ${MEDIA_DIR:-/media}:/media:ro,z
+    environment:
+      APP_DATA_DIR: /var/www/html/data
+      MEDIA_ROOT: /media
+      TZ: Europe/Berlin
+    healthcheck:
+      test: ["CMD", "php", "-r", "file_exists('/var/www/html/health.php') ? exit(0) : exit(1);"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
